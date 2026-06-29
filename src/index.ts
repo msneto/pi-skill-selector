@@ -814,14 +814,13 @@ function installSubmittedSkillMessageHandler(pi: ExtensionAPI): void {
 
 function installDollarSkillShortcut(ctx: ExtensionContext): void {
   let pickerOpen = false;
-  let lastKeyWasSpace = true; // Start true so bare $ at prompt start triggers
+  let lastKeyWasSpace = true;
 
   ctx.ui.onTerminalInput?.((data: string) => {
     if (pickerOpen) {
       return undefined;
     }
 
-    // Track whether the next key should allow $ trigger.
     const isSpace = matchesKey(data, Key.space) || matchesKey(data, Key.enter);
     const initialQuery = getDollarShortcutQuery(data);
 
@@ -830,7 +829,6 @@ function installDollarSkillShortcut(ctx: ExtensionContext): void {
       return undefined;
     }
 
-    // Only trigger if $ is preceded by a space (or start of line).
     if (!lastKeyWasSpace) {
       lastKeyWasSpace = isSpace;
       return undefined;
