@@ -17,7 +17,7 @@ import {
   type Focusable,
 } from "@earendil-works/pi-tui";
 
-type SkillPickerResult = string | null;
+type SkillPickerResult = string[] | null;
 type PickerThemeBg = "selectedBg" | "userMessageBg" | "customMessageBg" | "toolPendingBg" | "toolSuccessBg" | "toolErrorBg";
 type Rgb = { r: number; g: number; b: number };
 
@@ -251,13 +251,19 @@ function padVisible(text: string, width: number): string {
   return `${text}${" ".repeat(Math.max(width - visibleWidth(text), 0))}`;
 }
 
-function formatSkillRow(skill: SkillEntry, width: number, selected: boolean, theme: PickerTheme): string {
-  const prefix = selected ? theme.fg("accent", "› ") : "  ";
-  const nameWidth = Math.max(width - visibleWidth(prefix), 1);
+function formatSkillRow(
+  skill: SkillEntry,
+  width: number,
+  selected: boolean,
+  chosen: boolean,
+  theme: PickerTheme,
+): string {
+  const status = chosen ? "[x]" : "[ ]";
+  const nameWidth = Math.max(width - 7, 1);
   const rawName = fitVisible(skill.name, nameWidth);
-  const name = selected ? theme.fg("accent", theme.bold(rawName)) : rawName;
-  const row = padVisible(`${prefix}${name}`, width);
-  return selected && theme.bg ? theme.bg("selectedBg", row) : row;
+  const row = padVisible(`  ${status} ${rawName}`, width);
+  const selectedRow = selected ? theme.fg("accent", `› ${row.slice(2)}`) : row;
+  return selected && theme.bg ? theme.bg("selectedBg", selectedRow) : selectedRow;
 }
 
 function formatSelectedSkillDescription(skill: SkillEntry | undefined, width: number, theme: PickerTheme): string[] {
@@ -266,7 +272,7 @@ function formatSelectedSkillDescription(skill: SkillEntry | undefined, width: nu
   return ["", theme.fg("dim", fitVisible(description, width))];
 }
 
-function formatSkillRows(skills: SkillEntry[], selectedIndex: number, width: number, theme: PickerTheme): string[] {
+function formatSkillRows(skills: SkillEntry[], selectedIndex: number, width: number, theme: PickerTheme, selectedSkills: Set<string>): string[] {
   if (skills.length === 0) {
     return [theme.fg("warning", "  No matching skills")];
   }
@@ -277,7 +283,7 @@ function formatSkillRows(skills: SkillEntry[], selectedIndex: number, width: num
   const endIndex = Math.min(startIndex + visibleCount, skills.length);
   const rows = skills.slice(startIndex, endIndex).map((skill, offset) => {
     const index = startIndex + offset;
-    return formatSkillRow(skill, width, index === normalizedSelectedIndex, theme);
+    return formatSkillRow(skill, width, index === normalizedSelectedIndex, selectedSkills.has(skill.name), theme);
   });
 
   if (skills.length > visibleCount) {
@@ -302,7 +308,7 @@ function formatSkillPickerCard(skills: SkillEntry[], query: string, width: numbe
   const panelWidth = clamp(Math.floor(width), PANEL_MIN_WIDTH, PANEL_MAX_WIDTH);
   const bodyWidth = Math.max(panelWidth - 4, 1);
   const queryLabel = query ? `matching "${query}"` : "type to filter";
-  const body = ["Search", `> ${query}`, "", ...formatSkillRows(filtered, selectedIndex, bodyWidth, theme)].map((line) => truncateToWidth(line, bodyWidth, ""));
+  const body = ["Search", `> ${query}`, "", ...formatSkillRows(filtered, selectedIndex, bodyWidth, theme, new Set())].map((line) => truncateToWidth(line, bodyWidth, ""));
   const cardSurface: PickerThemeBg = "toolPendingBg";
   const styleCardBorder = styled ? cardBorderStyle(theme, cardSurface) : (text: string) => text;
 
@@ -329,6 +335,7 @@ class SkillPickerComponent implements Component, Focusable {
   private query: string;
   private filtered: SkillEntry[];
   private selectedIndex = 0;
+  private selectedSkills = new Set<string>();
   private _focused = false;
 
   constructor(
@@ -359,7 +366,7 @@ class SkillPickerComponent implements Component, Focusable {
       this.theme.fg("dim", "Search"),
       ...this.input.render(bodyWidth),
       "",
-      ...formatSkillRows(this.filtered, this.selectedIndex, bodyWidth, this.theme),
+      ...formatSkillRows(this.filtered, this.selectedIndex, bodyWidth, this.theme, this.selectedSkills),
     ].map((line) => truncateToWidth(line, bodyWidth, ""));
 
     const cardSurface: PickerThemeBg = "toolPendingBg";
@@ -370,7 +377,7 @@ class SkillPickerComponent implements Component, Focusable {
       title: "Skills",
       subtitle: `${this.filtered.length}/${this.skills.length} · ${queryLabel}`,
       body,
-      footer: "tab/enter select · ↑↓ move · esc",
+      footer: "tab toggle · enter accept · ↑↓ move · esc",
       styleSurface: (text) => safeBg(this.theme, cardSurface, text),
       styleBorder: styleCardBorder,
       styleAccentBorder: styleCardBorder,
@@ -385,6 +392,11 @@ class SkillPickerComponent implements Component, Focusable {
       return;
     }
 
+    if (matchesKey(data, Key.tab)) {
+      this.toggleCurrentSkill();
+      return;
+    }
+
     if (matchesKey(data, Key.up)) {
       this.moveSelection(-1);
       return;
@@ -396,7 +408,7 @@ class SkillPickerComponent implements Component, Focusable {
     }
 
     if (isSkillPickerConfirmKey(data)) {
-      this.selectCurrentSkill();
+      this.selectCurrentSkills();
       return;
     }
 
@@ -418,9 +430,18 @@ class SkillPickerComponent implements Component, Focusable {
     this.selectedIndex = (this.selectedIndex + delta + this.filtered.length) % this.filtered.length;
   }
 
-  private selectCurrentSkill(): void {
+  private toggleCurrentSkill(): void {
     const skill = this.filtered[this.selectedIndex];
-    if (skill) this.done(skill.name);
+    if (!skill) return;
+    if (this.selectedSkills.has(skill.name)) this.selectedSkills.delete(skill.name);
+    else this.selectedSkills.add(skill.name);
+  }
+
+  private selectCurrentSkills(): void {
+    const selected = [...this.selectedSkills];
+    const skill = this.filtered[this.selectedIndex];
+    if (skill && !this.selectedSkills.size) selected.push(skill.name);
+    this.done(selected.length > 0 ? selected : null);
   }
 }
 
@@ -589,9 +610,9 @@ function installDollarSkillShortcut(ctx: ExtensionContext): void {
 
     pickerOpen = true;
     void pickSkill(ctx, initialQuery)
-      .then((skillName) => {
-        if (skillName) {
-          ctx.ui.pasteToEditor(skillPromptInsertion(skillName));
+      .then((skillNames) => {
+        if (skillNames) {
+          ctx.ui.pasteToEditor(skillNames.map(skillPromptInsertion).join(""));
           lastKeyWasSpace = true;
         }
       })
@@ -609,10 +630,10 @@ export default function extension(pi: ExtensionAPI) {
   });
 
   pi.registerCommand("skill-selector", {
-    description: "Fuzzy-pick a skill and insert /skill:<name> into the prompt",
+    description: "Fuzzy-pick skills and insert /skill:<name> tokens into the prompt",
     handler: async (args, ctx) => {
-      const skillName = await pickSkill(ctx, args.trim());
-      if (skillName) ctx.ui.pasteToEditor(skillPromptInsertion(skillName));
+      const skillNames = await pickSkill(ctx, args.trim());
+      if (skillNames) ctx.ui.pasteToEditor(skillNames.map(skillPromptInsertion).join(""));
     },
   });
 }

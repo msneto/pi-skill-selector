@@ -140,7 +140,7 @@ test("renders a concise skill picker preview with clean ellipsis and tab hint", 
 
   expect(visible).toContain("│ Search                                                 │");
   expect(visible).toContain("│ > rocket                                               │");
-  expect(visible).toContain("│ › rocket-extension                                     │");
+  expect(visible).toContain("│ › [ ] rocket-extension                                 │");
   expect(visible).toContain("│ Pi-only workflow for shipping a locally developed Pi … │");
   expect(visible.at(-1)).toBe("╰─ tab/enter select · ↑↓ move · esc ─────────────────────╯");
   expectEveryLineVisibleWidth(preview, 58);
@@ -166,7 +166,7 @@ test("styled preview uses a visible elevated card surface and selected row backg
   expect(rendered).toContain("\u001b[48;2;230;233;239m");
   // Border at 45% mix: 230,233,239 mixed with 0,0,0 = 127,128,131
   expect(rendered).toContain("\u001b[38;2;127;128;131m╭");
-  expect(rendered).toContain("\u001b[48;2;204;208;218m› yeet");
+  expect(rendered).toContain("\u001b[48;2;204;208;218m› [ ] yeet");
   expectEveryLineVisibleWidth(preview, 58);
 });
 
@@ -361,7 +361,7 @@ test("extension registers command and installs a terminal $ shortcut on session 
     sessionStartHandler?.({}, {
       cwd: temp,
       ui: {
-        custom(factory: (tui: unknown, theme: unknown, keybindings: unknown, done: (result: string | null) => void) => unknown, options?: typeof customOptions) {
+        custom(factory: (tui: unknown, theme: unknown, keybindings: unknown, done: (result: string[] | null) => void) => unknown, options?: typeof customOptions) {
           customOptions = options;
           const fakeTui = {
             previousKittyImageIds,
@@ -379,7 +379,7 @@ test("extension registers command and installs a terminal $ shortcut on session 
           };
           factory(fakeTui, {}, {}, () => {});
           renderedDuringFactory = fakeTui.render(10);
-          return Promise.resolve("21st-sdk");
+          return Promise.resolve(["21st-sdk"]);
         },
         notify() {},
         onTerminalInput(handler: typeof terminalHandler) {
@@ -459,7 +459,7 @@ test("$ shortcut triggers after a space", async () => {
           handler({}, {
             cwd: temp,
             ui: {
-              custom() { return Promise.resolve("test-skill"); },
+              custom() { return Promise.resolve(["test-skill"]); },
               notify() {},
               onTerminalInput(h: typeof terminalHandler) {
                 terminalHandler = h;
@@ -499,7 +499,7 @@ test("$ shortcut triggers with Kitty keyboard protocol (CSI-u sequence)", async 
           handler({}, {
             cwd: temp,
             ui: {
-              custom() { return Promise.resolve("test-skill"); },
+              custom() { return Promise.resolve(["test-skill"]); },
               notify() {},
               onTerminalInput(h: typeof terminalHandler) {
                 terminalHandler = h;
@@ -537,7 +537,7 @@ test("$ shortcut triggers with shifted Kitty keyboard protocol sequence", async 
           handler({}, {
             cwd: temp,
             ui: {
-              custom() { return Promise.resolve("test-skill"); },
+              custom() { return Promise.resolve(["test-skill"]); },
               notify() {},
               onTerminalInput(h: typeof terminalHandler) {
                 terminalHandler = h;
@@ -649,7 +649,7 @@ test("$ shortcut can reopen after Escape dismisses the picker", async () => {
     expect(terminalHandler?.("$")).toEqual({ consume: true });
     expect(pendingPickers.length).toBe(2);
 
-    pendingPickers[1]?.("test-skill");
+    pendingPickers[1]?.(["test-skill"]);
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(pastedText).toEqual([skillPromptInsertion("test-skill")]);
   } finally {
@@ -840,7 +840,7 @@ test("e2e: skill picker opens fast with cached skills from .pi folder", async ()
     sessionStartHandler?.({}, {
       cwd: agentDir,
       ui: {
-        custom() { return Promise.resolve("test-skill"); },
+        custom() { return Promise.resolve(["test-skill"]); },
         notify() {},
         onTerminalInput(h: typeof terminalHandler) {
           terminalHandler = h;
