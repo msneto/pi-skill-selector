@@ -693,6 +693,21 @@ function getDollarShortcutQuery(data: string): string | null {
   return decodeKittyPrintable(data) === "$" ? "" : null;
 }
 
+function insertSelectedSkillsAtPromptStart(ctx: ExtensionContext, skillNames: string[] | string): void {
+  const selectedSkillNames = Array.isArray(skillNames) ? skillNames : [skillNames];
+  const insertion = selectedSkillNames.map(skillPromptInsertion).join("");
+
+  if (typeof ctx.ui.pasteToEditor === "function") {
+    ctx.ui.pasteToEditor(insertion);
+    return;
+  }
+
+  if (typeof ctx.ui.setEditorText === "function") {
+    const currentText = typeof ctx.ui.getEditorText === "function" ? ctx.ui.getEditorText() : "";
+    ctx.ui.setEditorText(`${insertion}${currentText}`);
+  }
+}
+
 function isImageContent(content: SkillInvocationTextContent | SkillInvocationImageContent): content is SkillInvocationImageContent {
   return content.type === "image";
 }

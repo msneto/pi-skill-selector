@@ -655,7 +655,7 @@ test("$ shortcut can reopen after Escape dismisses the picker", async () => {
 
   let terminalHandler: ((data: string) => { consume?: boolean } | undefined) | undefined;
   const pastedText: string[] = [];
-  const pendingPickers: Array<(value: string | null) => void> = [];
+  const pendingPickers: Array<(value: string[] | null) => void> = [];
 
   try {
     const mockExtension = {
@@ -666,7 +666,7 @@ test("$ shortcut can reopen after Escape dismisses the picker", async () => {
             cwd: temp,
             ui: {
               custom() {
-                return new Promise<string | null>((resolve) => {
+                return new Promise<string[] | null>((resolve) => {
                   pendingPickers.push(resolve);
                 });
               },
