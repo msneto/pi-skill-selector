@@ -403,9 +403,58 @@ function formatSkillRows(skills: SkillEntry[], selectedIndex: number, width: num
   return rows;
 }
 
+function identityText(text: string): string {
+  return text;
+}
+
+function truncateLinesToWidth(lines: string[], width: number): string[] {
+  return lines.map((line) => truncateToWidth(line, width, ""));
+}
+
+type SkillPickerCardStyles = {
+  styleSurface: (text: string) => string;
+  styleBorder: (text: string) => string;
+  styleAccentBorder: (text: string) => string;
+  styleTitle: (text: string) => string;
+  styleMuted: (text: string) => string;
+};
+
+function createSkillPickerCardStyles(theme: PickerTheme, styled: boolean): SkillPickerCardStyles {
+  const cardSurface: PickerThemeBg = "toolPendingBg";
+  const styleCardBorder = styled ? cardBorderStyle(theme, cardSurface) : identityText;
+
+  return {
+    styleSurface: styled ? (text) => safeBg(theme, cardSurface, text) : identityText,
+    styleBorder: styleCardBorder,
+    styleAccentBorder: styleCardBorder,
+    styleTitle: styled ? (text) => theme.fg("accent", theme.bold(text)) : identityText,
+    styleMuted: styled ? (text) => theme.fg("muted", text) : identityText,
+  };
+}
+
+function renderSkillPickerCard(
+  width: number,
+  subtitle: string,
+  body: string[],
+  footer: string,
+  theme: PickerTheme,
+  styled: boolean,
+): string[] {
+  const panelWidth = clamp(Math.floor(width), PANEL_MIN_WIDTH, PANEL_MAX_WIDTH);
+
+  return formatSkillPickerPanel({
+    width: panelWidth,
+    title: "Skills",
+    subtitle,
+    body,
+    footer,
+    ...createSkillPickerCardStyles(theme, styled),
+  });
+}
+
 function plainPickerTheme(): PickerTheme {
   return {
-    bold: (text) => text,
+    bold: identityText,
     fg: (_color, text) => text,
     bg: (_color, text) => text,
     getColorMode: () => "256color",
@@ -417,22 +466,9 @@ function formatSkillPickerCard(skills: SkillEntry[], query: string, width: numbe
   const panelWidth = clamp(Math.floor(width), PANEL_MIN_WIDTH, PANEL_MAX_WIDTH);
   const bodyWidth = Math.max(panelWidth - 4, 1);
   const queryLabel = query ? `matching "${query}"` : "type to filter";
-  const body = ["Search", `> ${query}`, "", ...formatSkillRows(filtered, selectedIndex, bodyWidth, theme, new Set())].map((line) => truncateToWidth(line, bodyWidth, ""));
-  const cardSurface: PickerThemeBg = "toolPendingBg";
-  const styleCardBorder = styled ? cardBorderStyle(theme, cardSurface) : (text: string) => text;
+  const body = truncateLinesToWidth(["Search", `> ${query}`, "", ...formatSkillRows(filtered, selectedIndex, bodyWidth, theme, new Set())], bodyWidth);
 
-  return formatSkillPickerPanel({
-    width: panelWidth,
-    title: "Skills",
-    subtitle: `${filtered.length}/${skills.length} · ${queryLabel}`,
-    body,
-    footer: "tab/enter select · ↑↓ move · esc",
-    styleSurface: styled ? (text) => safeBg(theme, cardSurface, text) : (text) => text,
-    styleBorder: styleCardBorder,
-    styleAccentBorder: styleCardBorder,
-    styleTitle: styled ? (text) => theme.fg("accent", theme.bold(text)) : (text) => text,
-    styleMuted: styled ? (text) => theme.fg("muted", text) : (text) => text,
-  });
+  return renderSkillPickerCard(panelWidth, `${filtered.length}/${skills.length} · ${queryLabel}`, body, "tab/enter select · ↑↓ move · esc", theme, styled);
 }
 
 export function formatSkillPickerPreview(skills: SkillEntry[], query: string, width = PANEL_MAX_WIDTH, selectedIndex = 0, theme?: PickerTheme): string[] {
@@ -471,28 +507,14 @@ class SkillPickerComponent implements Component, Focusable {
     const panelWidth = clamp(Math.floor(width), PANEL_MIN_WIDTH, PANEL_MAX_WIDTH);
     const bodyWidth = Math.max(panelWidth - 4, 1);
     const queryLabel = this.query ? `matching "${this.query}"` : "type to filter";
-    const body = [
+    const body = truncateLinesToWidth([
       this.theme.fg("dim", "Search"),
       ...this.input.render(bodyWidth),
       "",
       ...formatSkillRows(this.filtered, this.selectedIndex, bodyWidth, this.theme, this.selectedSkills),
-    ].map((line) => truncateToWidth(line, bodyWidth, ""));
+    ], bodyWidth);
 
-    const cardSurface: PickerThemeBg = "toolPendingBg";
-    const styleCardBorder = cardBorderStyle(this.theme, cardSurface);
-
-    return formatSkillPickerPanel({
-      width: panelWidth,
-      title: "Skills",
-      subtitle: `${this.filtered.length}/${this.skills.length} · ${queryLabel}`,
-      body,
-      footer: "tab toggle · enter accept · ↑↓ move · esc",
-      styleSurface: (text) => safeBg(this.theme, cardSurface, text),
-      styleBorder: styleCardBorder,
-      styleAccentBorder: styleCardBorder,
-      styleTitle: (text) => this.theme.fg("accent", this.theme.bold(text)),
-      styleMuted: (text) => this.theme.fg("muted", text),
-    });
+    return renderSkillPickerCard(panelWidth, `${this.filtered.length}/${this.skills.length} · ${queryLabel}`, body, "tab toggle · enter accept · ↑↓ move · esc", this.theme, true);
   }
 
   handleInput(data: string): void {
