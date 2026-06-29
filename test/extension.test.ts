@@ -706,6 +706,51 @@ test("$ shortcut can reopen after Escape dismisses the picker", async () => {
   }
 });
 
+test("$ shortcut inserts multiple selected skill tokens", async () => {
+  const temp = mkdtempSync(join(tmpdir(), "pi-skill-selector-shortcut-multi-"));
+  const skillRoot = join(temp, ".pi", "skills");
+  writeSkill(skillRoot, "beta-skill", "beta", "Beta skill");
+  writeSkill(skillRoot, "alpha-skill", "alpha", "Alpha skill");
+
+  let terminalHandler: ((data: string) => { consume?: boolean } | undefined) | undefined;
+  let pastedText: string | undefined;
+
+  try {
+    const mockExtension = {
+      registerCommand() {},
+      on(_event: string, handler: any) {
+        if (_event === "session_start") {
+          handler({}, {
+            cwd: temp,
+            ui: {
+              custom() {
+                return Promise.resolve(["beta", "alpha"]);
+              },
+              notify() {},
+              onTerminalInput(h: typeof terminalHandler) {
+                terminalHandler = h;
+                return () => {};
+              },
+              pasteToEditor(text: string) {
+                pastedText = text;
+              },
+            },
+          });
+        }
+      },
+    };
+    extension(mockExtension as any);
+
+    expect(terminalHandler).toBeDefined();
+    expect(terminalHandler?.("$")).toEqual({ consume: true });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(pastedText).toBe([skillPromptInsertion("beta"), skillPromptInsertion("alpha")].join(""));
+  } finally {
+    rmSync(temp, { recursive: true, force: true });
+  }
+});
+
 test("discoverSkills is cached and subsequent calls are fast", () => {
   clearSkillCache(); // Clear cache from previous tests
 

@@ -712,10 +712,10 @@ export default function extension(pi: ExtensionAPI) {
   });
 
   pi.registerCommand("skill-selector", {
-    description: "Fuzzy-pick skills and insert /skill:<name> tokens into the prompt",
+    description: "Fuzzy-pick skills and insert $tokens into the prompt",
     handler: async (args, ctx) => {
       const skillNames = await pickSkill(ctx, args.trim());
-      if (skillNames) ctx.ui.pasteToEditor(skillNames.map(skillPromptInsertion).join(""));
+      if (skillNames) insertSelectedSkillsAtPromptStart(ctx, skillNames);
     },
   });
 }
