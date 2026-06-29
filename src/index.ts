@@ -7,16 +7,21 @@ import {
   type ExtensionContext,
   type MessageRenderOptions,
   type ParsedSkillBlock,
+  SkillInvocationMessageComponent,
   type Theme,
+  UserMessageComponent,
 } from "@earendil-works/pi-coding-agent";
 import {
+  Container,
   decodeKittyPrintable,
   deleteAllKittyImages,
   deleteKittyImage,
   fuzzyFilter,
+  Image,
   Input,
   Key,
   matchesKey,
+  Spacer,
   truncateToWidth,
   visibleWidth,
   type Component,
@@ -45,6 +50,28 @@ export type SkillEntry = {
 type SkillInvocationMessageDetails = {
   blocks: ParsedSkillBlock[];
   userMessage?: string;
+};
+
+type SkillInvocationTextContent = {
+  type: "text";
+  text: string;
+};
+
+type SkillInvocationImageContent = {
+  type: "image";
+  data: string;
+  mimeType: string;
+};
+
+type SkillInvocationMessageContent = string | (SkillInvocationTextContent | SkillInvocationImageContent)[];
+
+type SkillInvocationMessage = {
+  role: "custom";
+  customType: string;
+  content: SkillInvocationMessageContent;
+  display: boolean;
+  details?: SkillInvocationMessageDetails;
+  timestamp: number;
 };
 
 type SelectedSkillPrompt = {
@@ -666,6 +693,110 @@ function getDollarShortcutQuery(data: string): string | null {
   return decodeKittyPrintable(data) === "$" ? "" : null;
 }
 
+function isImageContent(content: SkillInvocationTextContent | SkillInvocationImageContent): content is SkillInvocationImageContent {
+  return content.type === "image";
+}
+
+function getImageContents(message: SkillInvocationMessage): SkillInvocationImageContent[] {
+  if (!Array.isArray(message.content)) return [];
+  return message.content.filter(isImageContent);
+}
+
+function renderSkillInvocationMessage(
+  message: SkillInvocationMessage,
+  options: MessageRenderOptions,
+  theme: Theme,
+): Component | undefined {
+  const blocks = message.details?.blocks ?? [];
+  const userMessage = message.details?.userMessage;
+  const images = getImageContents(message);
+
+  if (blocks.length === 0 && !userMessage && images.length === 0) {
+    return undefined;
+  }
+
+  const container = new Container();
+  let hasRenderedSection = false;
+
+  for (const [index, block] of blocks.entries()) {
+    if (hasRenderedSection) {
+      container.addChild(new Spacer(1));
+    }
+
+    const skillComponent = new SkillInvocationMessageComponent(block);
+    skillComponent.setExpanded(options.expanded);
+    container.addChild(skillComponent);
+    hasRenderedSection = true;
+
+    if (index === blocks.length - 1 && userMessage) {
+      container.addChild(new Spacer(1));
+    }
+  }
+
+  if (userMessage) {
+    container.addChild(new UserMessageComponent(userMessage));
+    hasRenderedSection = true;
+  }
+
+  if (images.length > 0) {
+    if (hasRenderedSection) {
+      container.addChild(new Spacer(1));
+    }
+
+    for (const [index, image] of images.entries()) {
+      if (index > 0) {
+        container.addChild(new Spacer(1));
+      }
+
+      container.addChild(
+        new Image(image.data, image.mimeType, {
+          fallbackColor: (text: string) => theme.fg("muted", text),
+        }),
+      );
+    }
+  }
+
+  return container;
+}
+
+function installSkillInvocationMessageRenderer(pi: ExtensionAPI): void {
+  if (typeof pi.registerMessageRenderer !== "function") {
+    return;
+  }
+
+  pi.registerMessageRenderer<SkillInvocationMessageDetails>(SKILL_INVOCATION_MESSAGE_TYPE, renderSkillInvocationMessage);
+}
+
+function installSubmittedSkillMessageHandler(pi: ExtensionAPI): void {
+  pi.on("input", (event, ctx) => {
+    if (event.source === "extension") {
+      return { action: "continue" };
+    }
+
+    const selectedSkills = resolveSubmittedSkillSelection(event.text, getCachedSkills(ctx.cwd));
+    if (!selectedSkills) {
+      return { action: "continue" };
+    }
+
+    const textContent: SkillInvocationTextContent = { type: "text", text: selectedSkills.content };
+    const content = event.images?.length ? [textContent, ...event.images] : selectedSkills.content;
+
+    pi.sendMessage(
+      {
+        customType: SKILL_INVOCATION_MESSAGE_TYPE,
+        content,
+        display: true,
+        details: selectedSkills.details,
+      },
+      event.streamingBehavior
+        ? { triggerTurn: true, deliverAs: event.streamingBehavior }
+        : { triggerTurn: true },
+    );
+
+    return { action: "handled" };
+  });
+}
+
 function installDollarSkillShortcut(ctx: ExtensionContext): void {
   let pickerOpen = false;
   let lastKeyWasSpace = true; // Start true so bare $ at prompt start triggers
@@ -707,6 +838,9 @@ function installDollarSkillShortcut(ctx: ExtensionContext): void {
 }
 
 export default function extension(pi: ExtensionAPI) {
+  installSkillInvocationMessageRenderer(pi);
+  installSubmittedSkillMessageHandler(pi);
+
   pi.on("session_start", (_event, ctx) => {
     installDollarSkillShortcut(ctx);
   });

@@ -751,6 +751,107 @@ test("$ shortcut inserts multiple selected skill tokens", async () => {
   }
 });
 
+test("submitted $ tokens render as collapsed skill messages", async () => {
+  const temp = mkdtempSync(join(tmpdir(), "pi-skill-selector-input-"));
+  const skillsRoot = join(temp, ".pi", "skills");
+
+  writeSkill(skillsRoot, "code-simplify-skill", "code-simplify", "Code simplify");
+  writeSkill(skillsRoot, "code-engineering-skill", "code-engineering", "Code engineering");
+
+  let inputHandler: ((event: any, ctx: any) => Promise<any> | any) | undefined;
+  let messageRenderer: ((message: any, options: any, theme: any) => any) | undefined;
+  let sentMessage: any;
+  let sendMessageOptions: any;
+
+  try {
+    const mockExtension = {
+      registerCommand() {},
+      registerMessageRenderer(customType: string, renderer: any) {
+        if (customType === "skill-selector-invocation") {
+          messageRenderer = renderer;
+        }
+      },
+      sendMessage(message: any, options: any) {
+        sentMessage = message;
+        sendMessageOptions = options;
+      },
+      on(event: string, handler: any) {
+        if (event === "input") inputHandler = handler;
+      },
+    };
+    extension(mockExtension as any);
+
+    const result = await inputHandler?.(
+      {
+        type: "input",
+        text: "faça revisão conforme $code-simplify e $code-engineering",
+        source: "interactive",
+      },
+      { cwd: temp, ui: {} },
+    );
+
+    expect(result).toEqual({ action: "handled" });
+    expect(sendMessageOptions).toEqual({ triggerTurn: true });
+    expect(sentMessage).toEqual({
+      customType: "skill-selector-invocation",
+      content: [
+        `<skill name="code-engineering" location="${join(skillsRoot, "code-engineering-skill", "SKILL.md")}">`,
+        `References are relative to ${join(skillsRoot, "code-engineering-skill")}.`,
+        "",
+        "# code-engineering",
+        "</skill>",
+        "",
+        `<skill name="code-simplify" location="${join(skillsRoot, "code-simplify-skill", "SKILL.md")}">`,
+        `References are relative to ${join(skillsRoot, "code-simplify-skill")}.`,
+        "",
+        "# code-simplify",
+        "</skill>",
+        "",
+        "faça revisão conforme $code-simplify e $code-engineering",
+      ].join("\n"),
+      display: true,
+      details: {
+        blocks: [
+          {
+            name: "code-engineering",
+            location: join(skillsRoot, "code-engineering-skill", "SKILL.md"),
+            content: [
+              `References are relative to ${join(skillsRoot, "code-engineering-skill")}.`,
+              "",
+              "# code-engineering",
+            ].join("\n"),
+            userMessage: undefined,
+          },
+          {
+            name: "code-simplify",
+            location: join(skillsRoot, "code-simplify-skill", "SKILL.md"),
+            content: [
+              `References are relative to ${join(skillsRoot, "code-simplify-skill")}.`,
+              "",
+              "# code-simplify",
+            ].join("\n"),
+            userMessage: undefined,
+          },
+        ],
+        userMessage: "faça revisão conforme $code-simplify e $code-engineering",
+      },
+    });
+
+    initTheme();
+    const collapsed = messageRenderer?.(sentMessage, { expanded: false }, {});
+    const expanded = messageRenderer?.(sentMessage, { expanded: true }, {});
+
+    expect(collapsed).toBeDefined();
+    expect(expanded).toBeDefined();
+    expect(stripAnsi(collapsed!.render(120).join("\n"))).toContain("[skill] code-engineering");
+    expect(stripAnsi(collapsed!.render(120).join("\n"))).toContain("[skill] code-simplify");
+    expect(stripAnsi(collapsed!.render(120).join("\n"))).toContain("faça revisão conforme $code-simplify e $code-engineering");
+    expect(stripAnsi(expanded!.render(120).join("\n"))).toContain("References are relative to");
+  } finally {
+    rmSync(temp, { recursive: true, force: true });
+  }
+});
+
 test("discoverSkills is cached and subsequent calls are fast", () => {
   clearSkillCache(); // Clear cache from previous tests
 
