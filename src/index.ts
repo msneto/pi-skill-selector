@@ -2,13 +2,19 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 
-import { type ExtensionAPI, type ExtensionContext } from "@earendil-works/pi-coding-agent";
 import {
-  fuzzyFilter,
-  Input,
+  type ExtensionAPI,
+  type ExtensionContext,
+  type MessageRenderOptions,
+  type ParsedSkillBlock,
+  type Theme,
+} from "@earendil-works/pi-coding-agent";
+import {
   decodeKittyPrintable,
   deleteAllKittyImages,
   deleteKittyImage,
+  fuzzyFilter,
+  Input,
   Key,
   matchesKey,
   truncateToWidth,
@@ -36,6 +42,17 @@ export type SkillEntry = {
   source: "pi-user" | "agents-user" | "pi-project" | "agents-project";
 };
 
+type SkillInvocationMessageDetails = {
+  blocks: ParsedSkillBlock[];
+  userMessage?: string;
+};
+
+type SelectedSkillPrompt = {
+  content: string;
+  details: SkillInvocationMessageDetails;
+};
+
+const SKILL_INVOCATION_MESSAGE_TYPE = "skill-selector-invocation";
 const MAX_VISIBLE_SKILLS = 8;
 const PANEL_MIN_WIDTH = 44;
 const PANEL_MAX_WIDTH = 58;
@@ -235,8 +252,73 @@ export function filterSkills(skills: SkillEntry[], query: string): SkillEntry[] 
   return fuzzyFilter(skills, query, (skill) => `${skill.name} ${skill.description}`);
 }
 
+function stripFrontmatter(content: string): string {
+  return content.replace(/^---\s*\n[\s\S]*?\n---\s*\n?/, "");
+}
+
+function escapeXml(text: string): string {
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&apos;");
+}
+
+function getUniqueSortedSkills(skillEntries: SkillEntry[]): SkillEntry[] {
+  return [...new Map(skillEntries.map((skill) => [skill.name, skill])).values()].sort((a, b) => a.name.localeCompare(b.name));
+}
+
+function skillInvocationBlockForEntry(skill: SkillEntry): ParsedSkillBlock {
+  const body = stripFrontmatter(readFileSync(skill.filePath, "utf8")).trim();
+  return {
+    name: skill.name,
+    location: skill.filePath,
+    content: `References are relative to ${dirname(skill.filePath)}.\n\n${body}`,
+    userMessage: undefined,
+  };
+}
+
+function skillBlockToXml(skillBlock: ParsedSkillBlock): string {
+  const name = escapeXml(skillBlock.name);
+  const location = escapeXml(skillBlock.location);
+  const content = escapeXml(skillBlock.content);
+  return `<skill name="${name}" location="${location}">\n${content}\n</skill>`;
+}
+
+function buildSelectedSkillsPrompt(skillEntries: SkillEntry[], userText: string): SelectedSkillPrompt {
+  const uniqueSkills = getUniqueSortedSkills(skillEntries);
+  const skillBlocks = uniqueSkills.map(skillInvocationBlockForEntry);
+  const trimmedUserText = userText.trimStart();
+
+  return {
+    content: [...skillBlocks.map(skillBlockToXml), trimmedUserText].filter(Boolean).join("\n\n"),
+    details: {
+      blocks: skillBlocks,
+      userMessage: trimmedUserText || undefined,
+    },
+  };
+}
+
 export function skillPromptInsertion(skillName: string): string {
-  return `/skill:${skillName} `;
+  return `$${skillName} `;
+}
+
+export function formatSelectedSkillsPrompt(skillEntries: SkillEntry[], userText: string): string {
+  return buildSelectedSkillsPrompt(skillEntries, userText).content;
+}
+
+function resolveSubmittedSkillSelection(text: string, skills: SkillEntry[]): SelectedSkillPrompt | null {
+  const skillNames = [...new Set([...text.matchAll(/\$([A-Za-z0-9][A-Za-z0-9_-]*)/g)].map((match) => match[1]))].sort((a, b) => a.localeCompare(b));
+  if (skillNames.length === 0) return null;
+
+  const skillLookup = new Map(skills.map((skill) => [skill.name, skill]));
+  const matchedSkills = skillNames
+    .map((name) => skillLookup.get(name))
+    .filter((skill): skill is SkillEntry => Boolean(skill));
+
+  if (matchedSkills.length === 0) return null;
+  return buildSelectedSkillsPrompt(matchedSkills, text);
 }
 
 export function isSkillPickerConfirmKey(data: string): boolean {

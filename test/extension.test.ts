@@ -1,16 +1,20 @@
+import { execFileSync } from "node:child_process";
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 
 import { expect, test } from "bun:test";
 import { createAgentSession, DefaultResourceLoader, SessionManager } from "@earendil-works/pi-coding-agent";
 import { deleteAllKittyImages, TUI, visibleWidth } from "@earendil-works/pi-tui";
+import { initTheme } from "../node_modules/@earendil-works/pi-coding-agent/dist/modes/interactive/theme/theme.js";
 
 import extension, {
   clearSkillCache,
   clearVisibleTerminalImagesForOverlay,
   discoverSkills,
   filterSkills,
+  formatSelectedSkillsPrompt,
   formatSkillPickerPanel,
   formatSkillPickerPreview,
   getCachedSkills,
@@ -68,8 +72,53 @@ test("filters skills fuzzily across name and description", () => {
   expect(filterSkills(skills, "pull").map((skill) => skill.name)).toEqual(["github-pr"]);
 });
 
-test("inserts skill commands in Pi's built-in skill expansion format", () => {
-  expect(skillPromptInsertion("21st-sdk")).toBe("/skill:21st-sdk ");
+test("expands selected skills into exact Pi-style skill blocks", () => {
+  const temp = mkdtempSync(join(tmpdir(), "pi-skill-selector-"));
+  const home = join(temp, "home");
+  const cwd = join(temp, "repo");
+
+  writeSkill(join(cwd, ".pi", "skills"), "beta-skill", "beta", "Beta skill");
+  writeSkill(join(cwd, ".pi", "skills"), "alpha-skill", "alpha", "Alpha skill");
+
+  const skills = discoverSkills(cwd, home);
+  const prompt = formatSelectedSkillsPrompt([skills[0], skills[1], skills[0]], "hello world");
+
+  expect(prompt).toBe(
+    [
+      `<skill name="alpha" location="${join(cwd, ".pi", "skills", "alpha-skill", "SKILL.md")}">`,
+      `References are relative to ${join(cwd, ".pi", "skills", "alpha-skill")}.`,
+      "",
+      "# alpha",
+      "</skill>",
+      "",
+      `<skill name="beta" location="${join(cwd, ".pi", "skills", "beta-skill", "SKILL.md")}">`,
+      `References are relative to ${join(cwd, ".pi", "skills", "beta-skill")}.`,
+      "",
+      "# beta",
+      "</skill>",
+      "",
+      "hello world",
+    ].join("\n"),
+  );
+});
+
+test("expands selected skills exactly without trailing user text", () => {
+  const temp = mkdtempSync(join(tmpdir(), "pi-skill-selector-"));
+  const home = join(temp, "home");
+  const cwd = join(temp, "repo");
+
+  writeSkill(join(cwd, ".pi", "skills"), "alpha-skill", "alpha", "Alpha skill");
+  const skills = discoverSkills(cwd, home);
+
+  expect(formatSelectedSkillsPrompt([skills[0]], "")).toBe(
+    [
+      `<skill name="alpha" location="${join(cwd, ".pi", "skills", "alpha-skill", "SKILL.md")}">`,
+      `References are relative to ${join(cwd, ".pi", "skills", "alpha-skill")}.`,
+      "",
+      "# alpha",
+      "</skill>",
+    ].join("\n"),
+  );
 });
 
 test("treats tab as a picker confirm key like enter", () => {
