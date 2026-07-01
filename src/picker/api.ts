@@ -1,5 +1,5 @@
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
-import type { AutocompleteItem, AutocompleteProvider, AutocompleteSuggestions } from "@earendil-works/pi-tui";
+import type { AutocompleteItem, AutocompleteSuggestions } from "@earendil-works/pi-tui";
 
 /** Picker behavior mode.
  *
@@ -7,12 +7,6 @@ import type { AutocompleteItem, AutocompleteProvider, AutocompleteSuggestions } 
  * `multi` means the picker may return multiple values and must use overlay UI.
  */
 export type PickerMode = "single" | "multi";
-
-/** UI presentation for single-select pickers.
- *
- * Example: `inline` for editor dropdowns, `overlay` for a centered picker.
- */
-export type PickerPresentation = "inline" | "overlay";
 
 /**
  * Result of matching a trigger against text before the cursor.
@@ -85,7 +79,6 @@ export interface PickerBaseConfig<T> {
  * ```ts
  * const config: SinglePickerConfig<string> = {
  *   mode: "single",
- *   presentation: "inline",
  *   trigger: matchToken("@"),
  *   source,
  *   insert: (value) => value,
@@ -94,7 +87,6 @@ export interface PickerBaseConfig<T> {
  */
 export interface SinglePickerConfig<T> extends PickerBaseConfig<T> {
 	mode: "single";
-	presentation?: PickerPresentation;
 	insert(value: T): string;
 }
 
@@ -106,7 +98,6 @@ export interface SinglePickerConfig<T> extends PickerBaseConfig<T> {
  */
 export interface MultiPickerConfig<T> extends PickerBaseConfig<T> {
 	mode: "multi";
-	presentation: "overlay";
 	insert(values: readonly T[]): string;
 }
 
@@ -124,8 +115,7 @@ export type PickerResult<T, C extends PickerConfig<T>> = C extends MultiPickerCo
 /**
  * Runtime picker adapter.
  *
- * This is the Pi-facing abstraction that can open an overlay and optionally
- * expose an autocomplete provider.
+ * This is the Pi-facing abstraction that can open an overlay.
  */
 export interface Picker<T, C extends PickerConfig<T>> {
 	/**
@@ -137,10 +127,6 @@ export interface Picker<T, C extends PickerConfig<T>> {
 	 * ```
 	 */
 	openOverlay(ctx: ExtensionContext, options?: { query?: string }): Promise<PickerResult<T, C> | null>;
-	/**
-	 * Expose the picker through Pi's autocomplete pipeline.
-	 */
-	asAutocompleteProvider(current: AutocompleteProvider): AutocompleteProvider;
 }
 
 /**
@@ -172,7 +158,7 @@ export function matchPrefix(prefix: string): PickerTrigger {
  * // "use $sk" -> { prefix: "$sk", query: "sk" }
  * ```
  */
-export function matchToken(prefix: string, pattern = /([A-Za-z0-9][A-Za-z0-9_-]*)$/): PickerTrigger {
+export function matchToken(prefix: string, pattern = /^([A-Za-z0-9][A-Za-z0-9_-]*)?$/): PickerTrigger {
 	return {
 		match(beforeCursor: string): PickerMatch | null {
 			const triggerIndex = beforeCursor.lastIndexOf(prefix);
@@ -188,4 +174,4 @@ export function matchToken(prefix: string, pattern = /([A-Za-z0-9][A-Za-z0-9_-]*
 	};
 }
 
-export type { AutocompleteItem, AutocompleteProvider, AutocompleteSuggestions };
+export type { AutocompleteItem, AutocompleteSuggestions };
