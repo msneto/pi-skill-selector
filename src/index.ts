@@ -715,6 +715,20 @@ function getDollarShortcutQuery(data: string): string | null {
   return decodeKittyPrintable(data) === "$" ? "" : null;
 }
 
+function isEditorEmpty(ctx: ExtensionContext): boolean {
+  if (typeof ctx.ui.getEditorText !== "function") return false;
+
+  try {
+    return ctx.ui.getEditorText() === "";
+  } catch {
+    return false;
+  }
+}
+
+function shouldOpenDollarShortcut(ctx: ExtensionContext, lastKeyWasSpace: boolean): boolean {
+  return lastKeyWasSpace || isEditorEmpty(ctx);
+}
+
 function insertSelectedSkillsAtPromptStart(ctx: ExtensionContext, skillNames: string[] | string): void {
   const selectedSkillNames = Array.isArray(skillNames) ? skillNames : [skillNames];
   const insertion = selectedSkillNames.map(skillPromptInsertion).join("");
@@ -851,7 +865,7 @@ function installDollarSkillShortcut(ctx: ExtensionContext): void {
       return undefined;
     }
 
-    if (!lastKeyWasSpace) {
+    if (!shouldOpenDollarShortcut(ctx, lastKeyWasSpace)) {
       lastKeyWasSpace = isSpace;
       return undefined;
     }

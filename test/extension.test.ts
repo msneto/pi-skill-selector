@@ -533,6 +533,59 @@ test("$ shortcut triggers after a space", async () => {
   }
 });
 
+test("$ shortcut opens at a fresh prompt", async () => {
+  const temp = mkdtempSync(join(tmpdir(), "pi-skill-selector-editor-start-"));
+  writeSkill(join(temp, ".pi", "skills"), "test-skill", "test-skill", "Test skill");
+
+  let terminalHandler: ((data: string) => { consume?: boolean } | undefined) | undefined;
+  let editorText = "";
+  let pickerOpened = false;
+
+  try {
+    const mockExtension = {
+      registerCommand() {},
+      on(_event: string, handler: any) {
+        if (_event === "session_start") {
+          handler({}, {
+            cwd: temp,
+            ui: {
+              custom() {
+                pickerOpened = true;
+                return Promise.resolve(null);
+              },
+              notify() {},
+              onTerminalInput(h: typeof terminalHandler) {
+                terminalHandler = h;
+                return () => {};
+              },
+              getEditorText() {
+                return editorText;
+              },
+              setEditorText(text: string) {
+                editorText = text;
+              },
+              pasteToEditor() {},
+            },
+          });
+        }
+      },
+    };
+    extension(mockExtension as any);
+
+    expect(terminalHandler).toBeDefined();
+
+    editorText = "x";
+    expect(terminalHandler?.("x")).toBeUndefined();
+
+    editorText = "";
+    expect(terminalHandler?.("$")).toEqual({ consume: true });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(pickerOpened).toBe(true);
+  } finally {
+    rmSync(temp, { recursive: true, force: true });
+  }
+});
+
 test("$ shortcut triggers with Kitty keyboard protocol (CSI-u sequence)", async () => {
   const temp = mkdtempSync(join(tmpdir(), "pi-skill-selector-kitty-"));
   writeSkill(join(temp, ".pi", "skills"), "test-skill", "test-skill", "Test skill");
