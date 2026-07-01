@@ -51,6 +51,55 @@ You can also run:
 /skill-selector
 ```
 
+## Picker internals
+
+This repo now splits the generic picker engine from the skill-specific glue:
+
+- `src/picker/` = reusable picker primitives, overlay UI, and trigger helpers
+- `src/skill-selector.ts` = skill-specific wrapper that turns picker results into `$skill` tokens
+- `src/skills.ts` = skill discovery, prompt expansion, and Pi message rendering
+
+### Skill picker example
+
+```ts
+import { installDollarSkillShortcut, openSkillPicker } from "./src/skill-selector.ts";
+
+pi.on("session_start", (_event, ctx) => {
+  installDollarSkillShortcut(ctx);
+});
+
+pi.registerCommand("skill-selector", {
+  handler: async (args, ctx) => {
+    const names = await openSkillPicker(ctx, args.trim());
+    if (names) ctx.ui.pasteToEditor(names.map((name) => `$${name} `).join(""));
+  },
+});
+```
+
+### Generic picker example
+
+```ts
+import { matchToken } from "./src/picker/api.ts";
+import { openPickerOverlay } from "./src/picker/overlay.ts";
+
+const trigger = matchToken("@"); // reusable if you later wire autocomplete
+const items = [
+  { value: "/path/to/file.ts", label: "file.ts", description: "project file" },
+  { value: "/path/to/readme.md", label: "README.md", description: "docs" },
+];
+
+const picked = await openPickerOverlay(ctx, items, {
+  mode: "single",
+  initialQuery: "fi",
+  title: "Files",
+  footer: "enter select · esc cancel",
+});
+
+if (picked) {
+  // single-select returns one value; multi-select returns an array
+}
+```
+
 ## Development
 
 ```bash
