@@ -2,12 +2,13 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 
-import type {
-	ExtensionAPI,
-	ExtensionContext,
-	MessageRenderOptions,
-	ParsedSkillBlock,
-	Theme,
+import {
+	CONFIG_DIR_NAME,
+	type ExtensionAPI,
+	type ExtensionContext,
+	type MessageRenderOptions,
+	type ParsedSkillBlock,
+	type Theme,
 } from "@earendil-works/pi-coding-agent";
 import {
 	Container,
@@ -129,7 +130,7 @@ function findRepoRoot(startDir: string): string | null {
 }
 
 function projectSkillDirs(cwd: string): Array<{ path: string; source: SkillEntry["source"] }> {
-	const dirs: Array<{ path: string; source: SkillEntry["source"] }> = [{ path: join(cwd, ".pi", "skills"), source: "pi-project" }];
+	const dirs: Array<{ path: string; source: SkillEntry["source"] }> = [{ path: join(cwd, CONFIG_DIR_NAME, "skills"), source: "pi-project" }];
 	const repoRoot = findRepoRoot(cwd);
 	let current = resolve(cwd);
 
@@ -148,9 +149,9 @@ function projectSkillDirs(cwd: string): Array<{ path: string; source: SkillEntry
  * Discover skills from the current machine and project tree.
  *
  * Search order:
- * 1. `~/.pi/agent/skills`
+ * 1. `~/<config>/agent/skills`
  * 2. `~/.agents/skills`
- * 3. `<cwd>/.pi/skills`
+ * 3. `<cwd>/<config>/skills`
  * 4. `<cwd>/.agents/skills` up the tree to the repo root
  *
  * Duplicate names are de-duplicated by first hit.
@@ -162,7 +163,7 @@ function projectSkillDirs(cwd: string): Array<{ path: string; source: SkillEntry
  */
 export function discoverSkills(cwd: string, home = homedir()): SkillEntry[] {
 	const sources: Array<{ path: string; source: SkillEntry["source"] }> = [
-		{ path: join(home, ".pi", "agent", "skills"), source: "pi-user" },
+		{ path: join(home, CONFIG_DIR_NAME, "agent", "skills"), source: "pi-user" },
 		{ path: join(home, ".agents", "skills"), source: "agents-user" },
 		...projectSkillDirs(cwd),
 	];

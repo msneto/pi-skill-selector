@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 
 import { expect, test } from "bun:test";
-import { createAgentSession, DefaultResourceLoader, SessionManager } from "@earendil-works/pi-coding-agent";
+import { CONFIG_DIR_NAME, createAgentSession, DefaultResourceLoader, SessionManager } from "@earendil-works/pi-coding-agent";
 import { deleteAllKittyImages, TUI, visibleWidth } from "@earendil-works/pi-tui";
 import { initTheme } from "../node_modules/@earendil-works/pi-coding-agent/dist/modes/interactive/theme/theme.js";
 
@@ -52,9 +52,9 @@ test("discovers user and project skills with frontmatter metadata", () => {
   const home = join(temp, "home");
   const cwd = join(temp, "repo");
 
-  writeSkill(join(home, ".pi", "agent", "skills"), "global-skill", "global-one", "Global skill");
+  writeSkill(join(home, CONFIG_DIR_NAME, "agent", "skills"), "global-skill", "global-one", "Global skill");
   writeSkill(join(home, ".agents", "skills"), "agents-skill", "agents-one", "Agents skill");
-  writeSkill(join(cwd, ".pi", "skills"), "project-skill", "project-one", "Project skill");
+  writeSkill(join(cwd, CONFIG_DIR_NAME, "skills"), "project-skill", "project-one", "Project skill");
 
   const skills = discoverSkills(cwd, home);
 
@@ -77,22 +77,22 @@ test("expands selected skills into exact Pi-style skill blocks", () => {
   const home = join(temp, "home");
   const cwd = join(temp, "repo");
 
-  writeSkill(join(cwd, ".pi", "skills"), "beta-skill", "beta", "Beta skill");
-  writeSkill(join(cwd, ".pi", "skills"), "alpha-skill", "alpha", "Alpha skill");
+  writeSkill(join(cwd, CONFIG_DIR_NAME, "skills"), "beta-skill", "beta", "Beta skill");
+  writeSkill(join(cwd, CONFIG_DIR_NAME, "skills"), "alpha-skill", "alpha", "Alpha skill");
 
   const skills = discoverSkills(cwd, home);
   const prompt = formatSelectedSkillsPrompt([skills[0], skills[1], skills[0]], "hello world");
 
   expect(prompt).toBe(
     [
-      `<skill name="alpha" location="${join(cwd, ".pi", "skills", "alpha-skill", "SKILL.md")}">`,
-      `References are relative to ${join(cwd, ".pi", "skills", "alpha-skill")}.`,
+      `<skill name="alpha" location="${join(cwd, CONFIG_DIR_NAME, "skills", "alpha-skill", "SKILL.md")}">`,
+      `References are relative to ${join(cwd, CONFIG_DIR_NAME, "skills", "alpha-skill")}.`,
       "",
       "# alpha",
       "</skill>",
       "",
-      `<skill name="beta" location="${join(cwd, ".pi", "skills", "beta-skill", "SKILL.md")}">`,
-      `References are relative to ${join(cwd, ".pi", "skills", "beta-skill")}.`,
+      `<skill name="beta" location="${join(cwd, CONFIG_DIR_NAME, "skills", "beta-skill", "SKILL.md")}">`,
+      `References are relative to ${join(cwd, CONFIG_DIR_NAME, "skills", "beta-skill")}.`,
       "",
       "# beta",
       "</skill>",
@@ -107,13 +107,13 @@ test("expands selected skills exactly without trailing user text", () => {
   const home = join(temp, "home");
   const cwd = join(temp, "repo");
 
-  writeSkill(join(cwd, ".pi", "skills"), "alpha-skill", "alpha", "Alpha skill");
+  writeSkill(join(cwd, CONFIG_DIR_NAME, "skills"), "alpha-skill", "alpha", "Alpha skill");
   const skills = discoverSkills(cwd, home);
 
   expect(formatSelectedSkillsPrompt([skills[0]], "")).toBe(
     [
-      `<skill name="alpha" location="${join(cwd, ".pi", "skills", "alpha-skill", "SKILL.md")}">`,
-      `References are relative to ${join(cwd, ".pi", "skills", "alpha-skill")}.`,
+      `<skill name="alpha" location="${join(cwd, CONFIG_DIR_NAME, "skills", "alpha-skill", "SKILL.md")}">`,
+      `References are relative to ${join(cwd, CONFIG_DIR_NAME, "skills", "alpha-skill")}.`,
       "",
       "# alpha",
       "</skill>",
@@ -242,7 +242,7 @@ test("keeps panel width stable with OSC links, emoji, CJK, and narrow widths", (
   expectEveryLineVisibleWidth(panel, PRETTY_PANEL_MIN_WIDTH);
 });
 
-test("Pi SDK discovers the local .pi extension shim without loader errors", async () => {
+test("Pi SDK discovers the local config-dir extension shim without loader errors", async () => {
   const agentDir = mkdtempSync(join(tmpdir(), "pi-skill-selector-agent-"));
   try {
     const loader = new DefaultResourceLoader({
@@ -257,7 +257,7 @@ test("Pi SDK discovers the local .pi extension shim without loader errors", asyn
 
     const extensions = loader.getExtensions();
     expect(extensions.errors.filter((error) => error.path.includes("pi-skill-selector"))).toEqual([]);
-    expect(extensions.extensions.some((loaded) => loaded.path.endsWith(".pi/extensions/pi-skill-selector/index.ts"))).toBe(true);
+    expect(extensions.extensions.some((loaded) => loaded.path.endsWith(`${CONFIG_DIR_NAME}/extensions/pi-skill-selector/index.ts`))).toBe(true);
   } finally {
     rmSync(agentDir, { recursive: true, force: true });
   }
@@ -383,7 +383,7 @@ test("prepares a real TUI with stale Kitty graphics before selector overlay rend
 
 test("extension registers command and installs a terminal $ shortcut on session start", async () => {
   const temp = mkdtempSync(join(tmpdir(), "pi-skill-selector-shortcut-"));
-  writeSkill(join(temp, ".pi", "skills"), "21st-sdk", "21st-sdk", "21st Agents docs");
+  writeSkill(join(temp, CONFIG_DIR_NAME, "skills"), "21st-sdk", "21st-sdk", "21st Agents docs");
 
   let commandHandler: ((args: string, ctx: any) => Promise<void>) | undefined;
   let sessionStartHandler: ((_event: unknown, ctx: any) => void) | undefined;
@@ -458,7 +458,7 @@ test("extension registers command and installs a terminal $ shortcut on session 
 
 test("$ shortcut does not trigger when preceded by a non-space character", async () => {
   const temp = mkdtempSync(join(tmpdir(), "pi-skill-selector-space-"));
-  writeSkill(join(temp, ".pi", "skills"), "test-skill", "test-skill", "Test skill");
+  writeSkill(join(temp, CONFIG_DIR_NAME, "skills"), "test-skill", "test-skill", "Test skill");
 
   let terminalHandler: ((data: string) => { consume?: boolean } | undefined) | undefined;
 
@@ -495,7 +495,7 @@ test("$ shortcut does not trigger when preceded by a non-space character", async
 
 test("$ shortcut triggers after a space", async () => {
   const temp = mkdtempSync(join(tmpdir(), "pi-skill-selector-space-ok-"));
-  writeSkill(join(temp, ".pi", "skills"), "test-skill", "test-skill", "Test skill");
+  writeSkill(join(temp, CONFIG_DIR_NAME, "skills"), "test-skill", "test-skill", "Test skill");
 
   let terminalHandler: ((data: string) => { consume?: boolean } | undefined) | undefined;
   let pastedText: string | undefined;
@@ -535,7 +535,7 @@ test("$ shortcut triggers after a space", async () => {
 
 test("$ shortcut opens at a fresh prompt", async () => {
   const temp = mkdtempSync(join(tmpdir(), "pi-skill-selector-editor-start-"));
-  writeSkill(join(temp, ".pi", "skills"), "test-skill", "test-skill", "Test skill");
+  writeSkill(join(temp, CONFIG_DIR_NAME, "skills"), "test-skill", "test-skill", "Test skill");
 
   let terminalHandler: ((data: string) => { consume?: boolean } | undefined) | undefined;
   let editorText = "";
@@ -588,7 +588,7 @@ test("$ shortcut opens at a fresh prompt", async () => {
 
 test("$ shortcut triggers with Kitty keyboard protocol (CSI-u sequence)", async () => {
   const temp = mkdtempSync(join(tmpdir(), "pi-skill-selector-kitty-"));
-  writeSkill(join(temp, ".pi", "skills"), "test-skill", "test-skill", "Test skill");
+  writeSkill(join(temp, CONFIG_DIR_NAME, "skills"), "test-skill", "test-skill", "Test skill");
 
   let terminalHandler: ((data: string) => { consume?: boolean } | undefined) | undefined;
   let pastedText: string | undefined;
@@ -627,7 +627,7 @@ test("$ shortcut triggers with Kitty keyboard protocol (CSI-u sequence)", async 
 
 test("$ shortcut triggers with shifted Kitty keyboard protocol sequence", async () => {
   const temp = mkdtempSync(join(tmpdir(), "pi-skill-selector-kitty-shifted-"));
-  writeSkill(join(temp, ".pi", "skills"), "test-skill", "test-skill", "Test skill");
+  writeSkill(join(temp, CONFIG_DIR_NAME, "skills"), "test-skill", "test-skill", "Test skill");
 
   let terminalHandler: ((data: string) => { consume?: boolean } | undefined) | undefined;
 
@@ -664,7 +664,7 @@ test("$ shortcut triggers with shifted Kitty keyboard protocol sequence", async 
 
 test("pressing Escape after $ dismisses without inserting a literal dollar", async () => {
   const temp = mkdtempSync(join(tmpdir(), "pi-skill-selector-escape-"));
-  writeSkill(join(temp, ".pi", "skills"), "test-skill", "test-skill", "Test skill");
+  writeSkill(join(temp, CONFIG_DIR_NAME, "skills"), "test-skill", "test-skill", "Test skill");
 
   let terminalHandler: ((data: string) => { consume?: boolean } | undefined) | undefined;
   const pastedText: string[] = [];
@@ -704,7 +704,7 @@ test("pressing Escape after $ dismisses without inserting a literal dollar", asy
 
 test("$ shortcut can reopen after Escape dismisses the picker", async () => {
   const temp = mkdtempSync(join(tmpdir(), "pi-skill-selector-escape-reopen-"));
-  writeSkill(join(temp, ".pi", "skills"), "test-skill", "test-skill", "Test skill");
+  writeSkill(join(temp, CONFIG_DIR_NAME, "skills"), "test-skill", "test-skill", "Test skill");
 
   let terminalHandler: ((data: string) => { consume?: boolean } | undefined) | undefined;
   const pastedText: string[] = [];
@@ -761,7 +761,7 @@ test("$ shortcut can reopen after Escape dismisses the picker", async () => {
 
 test("$ shortcut inserts multiple selected skill tokens", async () => {
   const temp = mkdtempSync(join(tmpdir(), "pi-skill-selector-shortcut-multi-"));
-  const skillRoot = join(temp, ".pi", "skills");
+  const skillRoot = join(temp, CONFIG_DIR_NAME, "skills");
   writeSkill(skillRoot, "beta-skill", "beta", "Beta skill");
   writeSkill(skillRoot, "alpha-skill", "alpha", "Alpha skill");
 
@@ -806,7 +806,7 @@ test("$ shortcut inserts multiple selected skill tokens", async () => {
 
 test("submitted $ tokens render as collapsed skill messages", async () => {
   const temp = mkdtempSync(join(tmpdir(), "pi-skill-selector-input-"));
-  const skillsRoot = join(temp, ".pi", "skills");
+  const skillsRoot = join(temp, CONFIG_DIR_NAME, "skills");
 
   writeSkill(skillsRoot, "code-simplify-skill", "code-simplify", "Code simplify");
   writeSkill(skillsRoot, "code-engineering-skill", "code-engineering", "Code engineering");
@@ -912,8 +912,8 @@ test("discoverSkills is cached and subsequent calls are fast", () => {
   const home = join(temp, "home");
   const cwd = join(temp, "repo");
 
-  writeSkill(join(home, ".pi", "agent", "skills"), "global-skill", "global-one", "Global skill");
-  writeSkill(join(cwd, ".pi", "skills"), "project-skill", "project-one", "Project skill");
+  writeSkill(join(home, CONFIG_DIR_NAME, "agent", "skills"), "global-skill", "global-one", "Global skill");
+  writeSkill(join(cwd, CONFIG_DIR_NAME, "skills"), "project-skill", "project-one", "Project skill");
 
   try {
     // First call should scan disk
@@ -944,7 +944,7 @@ test("extension loads in under 50ms with many skills", () => {
 
   // Create 100 skills to simulate a large skill library
   for (let i = 0; i < 100; i++) {
-    writeSkill(join(home, ".pi", "agent", "skills"), `skill-${i}`, `skill-${i}`, `Description ${i}`);
+    writeSkill(join(home, CONFIG_DIR_NAME, "agent", "skills"), `skill-${i}`, `skill-${i}`, `Description ${i}`);
   }
 
   let sessionStartHandler: ((_event: unknown, ctx: any) => void) | undefined;
@@ -1015,11 +1015,11 @@ test("border is visible in both light and dark themes", () => {
   expect(lightRendered).toContain("\u001b[38;2;127;128;131m");
 });
 
-test("e2e: Pi SDK loads the extension from a .pi folder in under 100ms", async () => {
+test("e2e: Pi SDK loads the extension from the config directory in under 100ms", async () => {
   const agentDir = mkdtempSync(join(tmpdir(), "pi-skill-selector-e2e-"));
   try {
-    // Create a .pi folder structure with skills
-    const piSkillsDir = join(agentDir, ".pi", "skills");
+    // Create a config directory structure with skills
+    const piSkillsDir = join(agentDir, CONFIG_DIR_NAME, "skills");
     for (let i = 0; i < 50; i++) {
       writeSkill(piSkillsDir, `skill-${i}`, `skill-${i}`, `Description ${i}`);
     }
@@ -1057,16 +1057,16 @@ test("e2e: Pi SDK loads the extension from a .pi folder in under 100ms", async (
   }
 });
 
-test("e2e: skill picker opens fast with cached skills from .pi folder", async () => {
+test("e2e: skill picker opens fast with cached skills from the config directory", async () => {
   const agentDir = mkdtempSync(join(tmpdir(), "pi-skill-picker-e2e-"));
   let pastedText: string | undefined;
 
   try {
-    // Create a .pi/skills folder with test skills
-    const piSkillsDir = join(agentDir, ".pi", "skills");
+    // Create a config/skills folder with test skills
+    const piSkillsDir = join(agentDir, CONFIG_DIR_NAME, "skills");
     writeSkill(piSkillsDir, "test-skill", "test-skill", "A test skill");
 
-    // Directly test the extension with the .pi folder
+    // Directly test the extension with the config directory
     let terminalHandler: ((data: string) => { consume?: boolean } | undefined) | undefined;
     let commandHandler: ((args: string, ctx: any) => Promise<void>) | undefined;
     let sessionStartHandler: ((_event: unknown, ctx: any) => void) | undefined;
@@ -1083,7 +1083,7 @@ test("e2e: skill picker opens fast with cached skills from .pi folder", async ()
     expect(commandHandler).toBeDefined();
     expect(sessionStartHandler).toBeDefined();
 
-    // Simulate session_start with the .pi folder
+    // Simulate session_start with the config directory
     const start = performance.now();
     sessionStartHandler?.({}, {
       cwd: agentDir,
