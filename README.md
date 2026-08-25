@@ -8,7 +8,7 @@ Pi extension that turns `$` into a fuzzy skill selector.
 - intercepts `$` anywhere in the prompt before the active editor consumes it
 - opens an overlay skill picker
 - fuzzy-filters skills case-insensitively by name and description
-- inserts `/skill:<name> ` at the cursor so Pi's built-in skill expansion loads the selected skill
+- inserts `$<name> ` tokens at the cursor so Pi can expand the selected skills
 - also provides `/skill-selector` as a command fallback
 
 ## Install
@@ -39,10 +39,10 @@ In interactive Pi, type:
 $
 ```
 
-Pick a skill, press Enter, and the extension inserts:
+Pick a skill, press Enter, and the extension inserts one or more:
 
 ```text
-/skill:<skill-name> 
+$<skill-name> 
 ```
 
 You can also run:
@@ -62,7 +62,7 @@ This repo now splits the generic picker engine from the skill-specific glue:
 ### Skill picker example
 
 ```ts
-import { installDollarSkillShortcut, openSkillPicker } from "./src/skill-selector.ts";
+import { installDollarSkillShortcut, insertSelectedSkillsAtPromptStart, openSkillPicker } from "./src/index.ts";
 
 pi.on("session_start", (_event, ctx) => {
   installDollarSkillShortcut(ctx);
@@ -71,7 +71,7 @@ pi.on("session_start", (_event, ctx) => {
 pi.registerCommand("skill-selector", {
   handler: async (args, ctx) => {
     const names = await openSkillPicker(ctx, args.trim());
-    if (names) ctx.ui.pasteToEditor(names.map((name) => `$${name} `).join(""));
+    if (names) insertSelectedSkillsAtPromptStart(ctx, names);
   },
 });
 ```

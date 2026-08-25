@@ -1,6 +1,6 @@
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { Key, matchesKey } from "@earendil-works/pi-tui";
-import { getCachedSkills, skillPromptInsertion, type SkillEntry } from "./skills.ts";
+import { getCachedSkills, insertSelectedSkillsAtPromptStart, type SkillEntry } from "./skills.ts";
 import { openPickerOverlay } from "./picker/overlay.ts";
 import type { PickerItem } from "./picker/api.ts";
 import { formatPickerPreview, isPickerConfirmKey, type PickerTheme } from "./picker/ui.ts";
@@ -126,7 +126,7 @@ export function installDollarSkillShortcut(ctx: ExtensionContext): void {
 		void openSkillPicker(ctx, initialQuery)
 			.then((skillNames) => {
 				if (skillNames) {
-					ctx.ui.pasteToEditor(skillNames.map(skillPromptInsertion).join(""));
+					insertSelectedSkillsAtPromptStart(ctx, skillNames);
 					lastKeyWasSpace = true;
 				}
 			})
