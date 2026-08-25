@@ -6,8 +6,8 @@ import { pathToFileURL } from "node:url";
 
 import { expect, test } from "bun:test";
 import { CONFIG_DIR_NAME, createAgentSession, DefaultResourceLoader, SessionManager } from "@earendil-works/pi-coding-agent";
-import { deleteAllKittyImages, TUI, visibleWidth } from "@earendil-works/pi-tui";
-import { initTheme } from "../node_modules/@earendil-works/pi-coding-agent/dist/modes/interactive/theme/theme.js";
+import { compositeTuiLine, deleteAllKittyImages, visibleWidth } from "@earendil-works/pi-tui";
+import { initTheme } from "@earendil-works/pi-coding-agent";
 
 import extension, {
   clearSkillCache,
@@ -337,7 +337,7 @@ test("suppresses all terminal image lines while selector overlay is active", () 
   expect(tui.render(12)[1]).toContain("\u001b_G");
 });
 
-test("prepares a real TUI with stale Kitty graphics before selector overlay rendering", () => {
+test("patches overlay composition around stale Kitty graphics", () => {
   const writes: string[] = [];
   const terminal = {
     start() {},
@@ -364,12 +364,17 @@ test("prepares a real TUI with stale Kitty graphics before selector overlay rend
     setTitle() {},
     setProgress() {},
   };
-  const tui = new TUI(terminal, false) as unknown as {
+  const tui = {
+    terminal,
+    previousKittyImageIds: new Set([4242]),
+    compositeLineAt: compositeTuiLine,
+    render: () => ["before", "\u001b_Ga=T,f=100,i=4242;AAAA\u001b\\", "after"],
+  } as const as {
     terminal: typeof terminal;
     previousKittyImageIds: Set<number>;
     compositeLineAt(baseLine: string, overlayLine: string, startCol: number, overlayWidth: number, totalWidth: number): string;
+    render(width: number): string[];
   };
-  tui.previousKittyImageIds = new Set([4242]);
 
   patchTuiImageOverlayComposite(tui);
 
