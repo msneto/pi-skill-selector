@@ -255,16 +255,12 @@ export function skillPromptInsertion(skillName: string): string {
 }
 
 /**
- * Insert selected skill tokens at the start of the editor text.
+ * Insert selected skill tokens into the editor at its cursor.
  *
- * Falls back to `setEditorText()` when Pi does not expose `pasteToEditor()`.
- *
- * @example
- * ```ts
- * insertSelectedSkillsAtPromptStart(ctx, ["git", "review"]);
- * ```
+ * On older Pi versions without `pasteToEditor()`, tokens are prepended because
+ * `setEditorText()` does not expose a cursor position.
  */
-export function insertSelectedSkillsAtPromptStart(ctx: ExtensionContext, skillNames: string[] | string): void {
+export function insertSelectedSkills(ctx: ExtensionContext, skillNames: string[] | string): void {
 	const selectedSkillNames = Array.isArray(skillNames) ? skillNames : [skillNames];
 	const insertion = selectedSkillNames.map(skillPromptInsertion).join("");
 
@@ -278,6 +274,9 @@ export function insertSelectedSkillsAtPromptStart(ctx: ExtensionContext, skillNa
 		ctx.ui.setEditorText(`${insertion}${currentText}`);
 	}
 }
+
+/** @deprecated Use `insertSelectedSkills`; older Pi versions prepend tokens. */
+export const insertSelectedSkillsAtPromptStart = insertSelectedSkills;
 
 /**
  * Build the exact prompt body Pi should receive after skill expansion.
@@ -424,6 +423,7 @@ export function installSubmittedSkillMessageHandler(pi: ExtensionAPI): void {
 // Cache for discovered skills to avoid repeated disk scans
 let cachedSkills: SkillEntry[] | null = null;
 let cachedSkillsCwd: string | null = null;
+let cachedSkillsHome: string | null = null;
 
 /**
  * Return cached skills for the current working directory.
@@ -434,11 +434,13 @@ let cachedSkillsCwd: string | null = null;
  * ```
  */
 export function getCachedSkills(cwd: string, home?: string): SkillEntry[] {
-	if (cachedSkills && cachedSkillsCwd === cwd) {
+	const resolvedHome = home ?? homedir();
+	if (cachedSkills && cachedSkillsCwd === cwd && cachedSkillsHome === resolvedHome) {
 		return cachedSkills;
 	}
-	cachedSkills = discoverSkills(cwd, home);
+	cachedSkills = discoverSkills(cwd, resolvedHome);
 	cachedSkillsCwd = cwd;
+	cachedSkillsHome = resolvedHome;
 	return cachedSkills;
 }
 
@@ -446,4 +448,5 @@ export function getCachedSkills(cwd: string, home?: string): SkillEntry[] {
 export function clearSkillCache(): void {
 	cachedSkills = null;
 	cachedSkillsCwd = null;
+	cachedSkillsHome = null;
 }

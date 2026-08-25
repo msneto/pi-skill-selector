@@ -62,7 +62,7 @@ This repo now splits the generic picker engine from the skill-specific glue:
 ### Skill picker example
 
 ```ts
-import { installDollarSkillShortcut, insertSelectedSkillsAtPromptStart, openSkillPicker } from "./src/index.ts";
+import { installDollarSkillShortcut, insertSelectedSkills, openSkillPicker } from "./src/index.ts";
 
 pi.on("session_start", (_event, ctx) => {
   installDollarSkillShortcut(ctx);
@@ -71,7 +71,7 @@ pi.on("session_start", (_event, ctx) => {
 pi.registerCommand("skill-selector", {
   handler: async (args, ctx) => {
     const names = await openSkillPicker(ctx, args.trim());
-    if (names) insertSelectedSkillsAtPromptStart(ctx, names);
+    if (names) insertSelectedSkills(ctx, names);
   },
 });
 ```

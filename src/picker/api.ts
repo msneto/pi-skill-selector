@@ -1,6 +1,3 @@
-import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
-import type { AutocompleteItem, AutocompleteSuggestions } from "@earendil-works/pi-tui";
-
 /** Picker behavior mode.
  *
  * `single` means one value is returned.
@@ -52,84 +49,6 @@ export interface PickerItem<T = unknown> {
 }
 
 /**
- * Loads and adapts picker items for a given context.
- *
- * `load()` can fetch from disk, memory, git, network, or any other source.
- * `toItem()` converts the domain object into a display item.
- */
-export interface PickerSource<T> {
-	load(ctx: ExtensionContext, query: string, signal: AbortSignal): Promise<readonly T[]>;
-	toItem(ctx: ExtensionContext, value: T): PickerItem<T>;
-}
-
-/** Common picker configuration shared by single and multi-select flows. */
-export interface PickerBaseConfig<T> {
-	/** Trigger used to decide when the picker opens. */
-	trigger: PickerTrigger;
-	/** Source of candidate values. */
-	source: PickerSource<T>;
-	/** Maximum rows visible in the picker body. */
-	maxVisible?: number;
-}
-
-/**
- * Single-select picker configuration.
- *
- * @example
- * ```ts
- * const config: SinglePickerConfig<string> = {
- *   mode: "single",
- *   trigger: matchToken("@"),
- *   source,
- *   insert: (value) => value,
- * };
- * ```
- */
-export interface SinglePickerConfig<T> extends PickerBaseConfig<T> {
-	mode: "single";
-	insert(value: T): string;
-}
-
-/**
- * Multi-select picker configuration.
- *
- * Multi-select is intentionally overlay-only so the user can confirm a set of
- * values before insertion.
- */
-export interface MultiPickerConfig<T> extends PickerBaseConfig<T> {
-	mode: "multi";
-	insert(values: readonly T[]): string;
-}
-
-/** Union of supported picker configurations. */
-export type PickerConfig<T> = SinglePickerConfig<T> | MultiPickerConfig<T>;
-
-/**
- * Result type for a picker configuration.
- *
- * - single-select -> one value
- * - multi-select -> readonly array of values
- */
-export type PickerResult<T, C extends PickerConfig<T>> = C extends MultiPickerConfig<T> ? readonly T[] : T;
-
-/**
- * Runtime picker adapter.
- *
- * This is the Pi-facing abstraction that can open an overlay.
- */
-export interface Picker<T, C extends PickerConfig<T>> {
-	/**
-	 * Open the overlay picker.
-	 *
-	 * @example
-	 * ```ts
-	 * const picked = await picker.openOverlay(ctx, { query: "git" });
-	 * ```
-	 */
-	openOverlay(ctx: ExtensionContext, options?: { query?: string }): Promise<PickerResult<T, C> | null>;
-}
-
-/**
  * Build a trigger that opens when the cursor is directly after a prefix.
  *
  * @example
@@ -174,4 +93,3 @@ export function matchToken(prefix: string, pattern = /^([A-Za-z0-9][A-Za-z0-9_-]
 	};
 }
 
-export type { AutocompleteItem, AutocompleteSuggestions };

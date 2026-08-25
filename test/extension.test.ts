@@ -8,6 +8,7 @@ import { expect, test } from "bun:test";
 import { CONFIG_DIR_NAME, createAgentSession, DefaultResourceLoader, SessionManager } from "@earendil-works/pi-coding-agent";
 import { compositeTuiLine, deleteAllKittyImages, visibleWidth } from "@earendil-works/pi-tui";
 import { initTheme } from "@earendil-works/pi-coding-agent";
+import { shouldOpenDollarShortcut } from "../src/skill-trigger.ts";
 
 import extension, {
   clearSkillCache,
@@ -18,6 +19,7 @@ import extension, {
   formatSkillPickerPanel,
   formatSkillPickerPreview,
   getCachedSkills,
+  insertSelectedSkills,
   isSkillPickerConfirmKey,
   patchTuiImageOverlayComposite,
   skillPromptInsertion,
@@ -459,6 +461,14 @@ test("extension registers command and installs a terminal $ shortcut on session 
   } finally {
     rmSync(temp, { recursive: true, force: true });
   }
+});
+
+test("$ shortcut uses editor text instead of terminal input history", () => {
+  const context = (text: string) => ({ ui: { getEditorText: () => text } }) as any;
+
+  expect(shouldOpenDollarShortcut(context("word "), false)).toBe(true);
+  expect(shouldOpenDollarShortcut(context("word"), true)).toBe(false);
+  expect(shouldOpenDollarShortcut(context(""), false)).toBe(true);
 });
 
 test("$ shortcut does not trigger when preceded by a non-space character", async () => {
@@ -910,6 +920,20 @@ test("submitted $ tokens render as collapsed skill messages", async () => {
   }
 });
 
+test("inserts selected skill tokens at the cursor when Pi supports pasting", () => {
+  let pastedText: string | undefined;
+
+  insertSelectedSkills({
+    ui: {
+      pasteToEditor(text: string) {
+        pastedText = text;
+      },
+    },
+  } as any, ["alpha", "beta"]);
+
+  expect(pastedText).toBe("$alpha $beta ");
+});
+
 test("discoverSkills is cached and subsequent calls are fast", () => {
   clearSkillCache(); // Clear cache from previous tests
 
@@ -938,6 +962,25 @@ test("discoverSkills is cached and subsequent calls are fast", () => {
     // Cached call should be fast (under 1ms)
     expect(duration2).toBeLessThan(1);
   } finally {
+    rmSync(temp, { recursive: true, force: true });
+  }
+});
+
+test("skill cache keeps separate homes separate", () => {
+  clearSkillCache();
+  const temp = mkdtempSync(join(tmpdir(), "pi-skill-selector-cache-home-"));
+  const cwd = join(temp, "repo");
+  const firstHome = join(temp, "first-home");
+  const secondHome = join(temp, "second-home");
+
+  try {
+    writeSkill(join(firstHome, CONFIG_DIR_NAME, "agent", "skills"), "first", "first", "First skill");
+    writeSkill(join(secondHome, CONFIG_DIR_NAME, "agent", "skills"), "second", "second", "Second skill");
+
+    expect(getCachedSkills(cwd, firstHome).map((skill) => skill.name)).toEqual(["first"]);
+    expect(getCachedSkills(cwd, secondHome).map((skill) => skill.name)).toEqual(["second"]);
+  } finally {
+    clearSkillCache();
     rmSync(temp, { recursive: true, force: true });
   }
 });

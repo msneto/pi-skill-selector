@@ -6,16 +6,21 @@ export function getDollarShortcutQuery(data: string): string | null {
 	return decodeKittyPrintable(data) === "$" ? "" : null;
 }
 
-export function isEditorEmpty(ctx: ExtensionContext): boolean {
-	if (typeof ctx.ui.getEditorText !== "function") return false;
+function getEditorText(ctx: ExtensionContext): string | null {
+	if (typeof ctx.ui.getEditorText !== "function") return null;
 
 	try {
-		return ctx.ui.getEditorText() === "";
+		return ctx.ui.getEditorText();
 	} catch {
-		return false;
+		return null;
 	}
 }
 
+export function isEditorEmpty(ctx: ExtensionContext): boolean {
+	return getEditorText(ctx) === "";
+}
+
 export function shouldOpenDollarShortcut(ctx: ExtensionContext, lastKeyWasSpace: boolean): boolean {
-	return lastKeyWasSpace || isEditorEmpty(ctx);
+	const editorText = getEditorText(ctx);
+	return editorText === null ? lastKeyWasSpace : editorText === "" || /\s$/.test(editorText);
 }
