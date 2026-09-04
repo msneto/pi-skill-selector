@@ -920,18 +920,23 @@ test("submitted $ tokens render as collapsed skill messages", async () => {
   }
 });
 
-test("inserts selected skill tokens at the cursor when Pi supports pasting", () => {
+test("inserts selected skill tokens and refreshes the editor", () => {
   let pastedText: string | undefined;
+  let refreshRequested = false;
 
   insertSelectedSkills({
     ui: {
       pasteToEditor(text: string) {
         pastedText = text;
       },
+      setStatus(key: string, text: undefined) {
+        refreshRequested = key === "skill-selector" && text === undefined;
+      },
     },
   } as any, ["alpha", "beta"]);
 
   expect(pastedText).toBe("$alpha $beta ");
+  expect(refreshRequested).toBe(true);
 });
 
 test("discoverSkills is cached and subsequent calls are fast", () => {

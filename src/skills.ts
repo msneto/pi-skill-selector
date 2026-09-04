@@ -266,6 +266,8 @@ export function insertSelectedSkills(ctx: ExtensionContext, skillNames: string[]
 
 	if (typeof ctx.ui.pasteToEditor === "function") {
 		ctx.ui.pasteToEditor(insertion);
+		// `pasteToEditor()` changes the editor but does not request a TUI render.
+		ctx.ui.setStatus?.("skill-selector", undefined);
 		return;
 	}
 
